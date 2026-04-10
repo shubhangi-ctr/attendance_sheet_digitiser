@@ -153,12 +153,23 @@ def build_validation_summary(rows: list[dict]) -> list[str]:
     return issues
 
 
+def _flags_fingerprint(rows: list[dict]) -> str:
+    """Return a string that changes whenever validation flags change."""
+    parts = []
+    for r in rows:
+        flags = r.get("review_flags", [])
+        parts.append(
+            f"{r.get('row_number', 0)}:{'|'.join(flags) if isinstance(flags, list) else str(flags)}")
+    return ";".join(parts)
+
+
 def initialize_state() -> None:
     st.session_state.setdefault("raw_rows", [])
     st.session_state.setdefault("review_rows", [])
     st.session_state.setdefault("source_filename", "")
     st.session_state.setdefault("source_mime_type", "")
     st.session_state.setdefault("finalized_csv", None)
+    st.session_state.setdefault("editor_version", 0)
 
 
 def clear_finalized_state() -> None:
@@ -202,6 +213,8 @@ if extract_clicked and uploaded_file is not None:
             st.session_state["review_rows"] = validated_rows
             st.session_state["source_filename"] = uploaded_file.name
             st.session_state["source_mime_type"] = uploaded_file.type or ""
+            # Reset editor version so the data_editor picks up fresh data
+            st.session_state["editor_version"] = st.session_state["editor_version"] + 1
             st.success(f"Extracted {len(validated_rows)} attendance row(s).")
         except Exception as exc:
             st.error(f"Extraction failed: {exc}")
@@ -211,6 +224,12 @@ if extract_clicked and uploaded_file is not None:
 if st.session_state["review_rows"]:
     st.subheader("Review Extracted Rows")
     review_df = normalize_rows_for_editor(st.session_state["review_rows"])
+
+    # Dynamic key: changes when flags change, forcing the editor to re-render
+    # with the updated review_flags column. Normal same-flag edits keep the
+    # same key so the editor preserves the user's cursor / scroll position.
+    editor_key = f"main_editor_v{st.session_state['editor_version']}"
+
     edited_df = st.data_editor(
         review_df,
         use_container_width=True,
@@ -223,11 +242,20 @@ if st.session_state["review_rows"]:
         },
         disabled=["row_number", "review_flags", "requires_review"],
         hide_index=True,
-        key="main_editor",
+        key=editor_key,
     )
 
+    # Re-validate after every edit
+    old_fingerprint = _flags_fingerprint(st.session_state["review_rows"])
     reviewed_rows = validate_rows(dataframe_to_rows(edited_df))
+    new_fingerprint = _flags_fingerprint(reviewed_rows)
     st.session_state["review_rows"] = reviewed_rows
+
+    # If the flags changed (user fixed or broke something), bump the editor
+    # version so the next rerun renders the data_editor with fresh flags.
+    if old_fingerprint != new_fingerprint:
+        st.session_state["editor_version"] = st.session_state["editor_version"] + 1
+        st.rerun()
 
     flagged_rows = [row for row in reviewed_rows if row.get("requires_review")]
     total_rows = len(reviewed_rows)
@@ -238,73 +266,22 @@ if st.session_state["review_rows"]:
     metric_col2.metric("Rows Requiring Review", flagged_count)
     metric_col3.metric("Ready Rows", total_rows - flagged_count)
 
-    # ── Flagged Rows (editable) ─────────────────────────────────────────
-    if flagged_rows:
-        st.subheader("Flagged Entries")
-        st.warning(
-            "Some rows need confirmation before export. Edit or delete flagged entries below.")
-        for issue in build_validation_summary(reviewed_rows):
-            st.caption(issue)
-
-        flagged_df = normalize_rows_for_editor(flagged_rows)
-        edited_flagged_df = st.data_editor(
-            flagged_df[["row_number", "name", "employee_id",
-                        "signature_present", "notes", "review_flags"]],
-            use_container_width=True,
-            num_rows="dynamic",
-            column_config={
-                "row_number": st.column_config.NumberColumn("Row", disabled=True),
-                "signature_present": st.column_config.CheckboxColumn("Signature Present"),
-                "review_flags": st.column_config.TextColumn("Flags", disabled=True, width="large"),
-            },
-            disabled=["row_number", "review_flags"],
-            hide_index=True,
-            key="flagged_editor",
-        )
-
-        if st.button("Sync Flagged Changes"):
-            # Build a lookup of edited flagged rows by row_number
-            edited_flagged_records = edited_flagged_df.to_dict(
-                orient="records")
-            edited_by_row_num: dict[int, dict] = {}
-            for rec in edited_flagged_records:
-                rn = rec.get("row_number")
-                if rn is not None and not pd.isna(rn):
-                    edited_by_row_num[int(rn)] = rec
-
-            # Deleted row numbers (rows that were in flagged but no longer in the edited df)
-            original_flagged_row_nums = {r["row_number"] for r in flagged_rows}
-            surviving_row_nums = set(edited_by_row_num.keys())
-            deleted_row_nums = original_flagged_row_nums - surviving_row_nums
-
-            # Merge edits back into the full reviewed_rows list
-            merged: list[dict] = []
-            for row in reviewed_rows:
-                rn = row["row_number"]
-                if rn in deleted_row_nums:
-                    continue  # User deleted this flagged row
-                if rn in edited_by_row_num:
-                    edits = edited_by_row_num[rn]
-                    row = dict(row)  # copy
-                    for field in ("name", "employee_id", "notes"):
-                        val = edits.get(field)
-                        if val is not None and not (isinstance(val, float) and pd.isna(val)):
-                            row[field] = str(val).strip()
-                    sig = edits.get("signature_present")
-                    if sig is not None:
-                        row["signature_present"] = bool(sig)
-                merged.append(row)
-
-            # Re-validate and update state
-            re_validated = validate_rows(dataframe_to_rows(
-                normalize_rows_for_editor(merged)
-            ))
-            st.session_state["review_rows"] = re_validated
-            st.rerun()
+    # ── Flagged Rows ────────────────────────────────────────────────────
+    # if flagged_rows:
+    #     st.warning(
+    #         "Some rows need confirmation before export. Review the flagged entries below.")
+    #     for issue in build_validation_summary(reviewed_rows):
+    #         st.caption(issue)
+    #     flagged_df = normalize_rows_for_editor(flagged_rows)
+    #     st.dataframe(
+    #         flagged_df[["row_number", "name", "employee_id", "review_flags"]],
+    #         use_container_width=True,
+    #         hide_index=True,
+    #     )
 
     # ── Export ──────────────────────────────────────────────────────────
     st.divider()
-    finalize_clicked = st.button("Finalize LMS-ready CSV", type="primary")
+    finalize_clicked = st.button("Export LMS-ready CSV", type="primary")
     if finalize_clicked:
         st.session_state["finalized_csv"] = build_lms_csv(reviewed_rows)
         st.success("Ready for download!")
