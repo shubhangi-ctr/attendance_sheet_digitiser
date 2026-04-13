@@ -112,7 +112,8 @@ def _normalize_row(row: Mapping[str, object], index: int) -> dict:
         or _extract_employee_id_candidates(raw_name)
         or _extract_employee_id_candidates(notes)
     )
-    employee_id = employee_id_candidates[0] if employee_id_candidates else _normalize_employee_id(raw_employee_id)
+    employee_id = employee_id_candidates[0] if employee_id_candidates else _normalize_employee_id(
+        raw_employee_id)
 
     employee_id_residual = _remove_employee_id_candidates(raw_employee_id)
     name_without_ids = _remove_employee_id_candidates(raw_name)
@@ -133,6 +134,7 @@ def _normalize_row(row: Mapping[str, object], index: int) -> dict:
         "employee_id": employee_id,
         "signature_present": _bool_value(row, "signature_present"),
         "attendance_date": _string_value(row, "attendance_date"),
+        "training_time": _string_value(row, "training_time"),
         "training_title": _string_value(row, "training_title"),
         "facilitator_name": _string_value(row, "facilitator_name"),
         "notes": notes,

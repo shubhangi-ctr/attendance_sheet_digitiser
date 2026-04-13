@@ -22,6 +22,7 @@ APP_DIR = Path(__file__).resolve().parent
 _DEFAULT_TRAINING_TITLE = ""
 _DEFAULT_TRAINING_DATE = ""
 _DEFAULT_FACILITATOR_NAME = ""
+_DEFAULT_TRAINING_TIME = ""
 
 
 def normalize_rows_for_editor(rows: list[dict]) -> pd.DataFrame:
@@ -34,6 +35,7 @@ def normalize_rows_for_editor(rows: list[dict]) -> pd.DataFrame:
                 "employee_id": row.get("employee_id", ""),
                 "signature_present": bool(row.get("signature_present", False)),
                 "attendance_date": row.get("attendance_date", ""),
+                "training_time": row.get("training_time", ""),
                 "training_title": row.get("training_title", ""),
                 "facilitator_name": row.get("facilitator_name", ""),
                 "notes": row.get("notes", ""),
@@ -72,12 +74,13 @@ def dataframe_to_rows(df: pd.DataFrame) -> list[dict]:
         name = clean_value(row.get("name", ""))
         employee_id = clean_value(row.get("employee_id", ""))
         attendance_date = clean_value(row.get("attendance_date", ""))
+        training_time = clean_value(row.get("training_time", ""))
         training_title = clean_value(row.get("training_title", ""))
         facilitator_name = clean_value(row.get("facilitator_name", ""))
         notes = clean_value(row.get("notes", ""))
         signature_present = clean_bool(row.get("signature_present", False))
 
-        if not any([name, employee_id, attendance_date, training_title, facilitator_name, notes, signature_present]):
+        if not any([name, employee_id, attendance_date, training_time, training_title, facilitator_name, notes, signature_present]):
             continue
 
         record = {
@@ -86,6 +89,7 @@ def dataframe_to_rows(df: pd.DataFrame) -> list[dict]:
             "employee_id": employee_id,
             "signature_present": signature_present,
             "attendance_date": attendance_date,
+            "training_time": training_time,
             "training_title": training_title,
             "facilitator_name": facilitator_name,
             "notes": notes,
@@ -206,6 +210,7 @@ if extract_clicked and uploaded_file is not None:
                 filename=uploaded_file.name,
                 training_title=_DEFAULT_TRAINING_TITLE,
                 training_date=_DEFAULT_TRAINING_DATE,
+                training_time=_DEFAULT_TRAINING_TIME,
                 facilitator_name=_DEFAULT_FACILITATOR_NAME,
             )
             validated_rows = validate_rows(extracted_rows)
@@ -238,7 +243,7 @@ if st.session_state["review_rows"]:
             "row_number": st.column_config.NumberColumn("Row", disabled=True),
             "signature_present": st.column_config.CheckboxColumn("Signature Present"),
             "review_flags": st.column_config.TextColumn("Validation Flags", disabled=True, width="large"),
-            "requires_review": st.column_config.CheckboxColumn("Needs Review", disabled=True),
+            "requires_review": st.column_config.CheckboxColumn("Needs Review", disabled=False),
         },
         disabled=["row_number", "review_flags", "requires_review"],
         hide_index=True,

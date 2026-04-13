@@ -50,6 +50,7 @@ ROW_KEYS = {
     "employee_id",
     "signature_present",
     "attendance_date",
+    "training_time",
     "training_title",
     "facilitator_name",
     "notes",
@@ -67,13 +68,60 @@ Return a JSON array where each item follows this schema:
   "employee_id": "",
   "signature_present": true,
   "attendance_date": "",
+  "training_time":"",
   "training_title": "",
   "facilitator_name": "",
   "notes": ""
 }}
 
 You are a highly capable intelligent document processor. You will extract data from clinical training sign-in sheets, even when text is messy and handwritten.
+Below are FEW-SHOT EXAMPLES demonstrating successful extraction from this complex document:
 
+Example 1: A neat entry.
+Input: (Row 1 from image_0.png) HI257 DOMADIA DEEP, scribbled signature.
+Output (JSON item):
+{{
+  "row_number": 1,
+  "name": "DOMADIA DEEP",
+  "employee_id": "HI257",
+  "signature_present": true,
+  "attendance_date": "24 July 2024",
+  "training_time":"04:00 PM - 05:00 PM",
+  "training_title": "Introductory session on Power BI",
+  "facilitator_name": "Rushi Shah, Meghanshu Bhatia",
+  "notes": ""
+}}
+
+Example 2: A messy ID.
+Input: (Row 6 from image_0.png) HI, Dhaval Vasavada, signature ink decider decided.
+Instruction: Extract 'HI' as the best-read ID and add a note.
+Output (JSON item):
+{{
+  "row_number": 6,
+  "name": "Dhaval Vasavada",
+  "employee_id": "HI",
+  "signature_present": true,
+  "attendance_date": "24 July 2024",
+  "training_time":"04:00 PM - 05:00 PM",
+  "training_title": "Introductory session on Power BI",
+  "facilitator_name": "Rushi Shah, Meghanshu Bhatia",
+  "notes": "Employee ID HI prefix detected, but digits are missing. Attendee name confirmed."
+}}
+
+Example 3: A confused ID and messy name.
+Input: (Row 3 from image_0.png) Messey, looks like a mix of M/H, I/1, ... HI pattern, digits are present. Name looks messy.
+Output (JSON item):
+{{
+  "row_number": 3,
+  "name": "Pratika Karna",
+  "employee_id": "HI202",
+  "signature_present": true,
+  "attendance_date": "24 July 2024",
+  "training_time":"04:00 PM - 05:00 PM",
+  "training_title": "Introductory session on Power BI",
+  "facilitator_name": "Rushi Shah, Meghanshu Bhatia",
+  "notes": ""
+}}
 
 Instructions:
 - The sheet may have top metadata such as Session, Date, Time, and Trainer/Speaker.
@@ -81,6 +129,7 @@ Instructions:
 - Extract ONLY rows from the Attendees section for LMS attendance output.
 - Ignore trainer/speaker rows.
 - The Attendees table columns are Employee ID, Name, and Signature.
+- If Time is visible at the top (e.g., "04:00 PM to 5:00 PM"), use it as "training_time".
 - Read the table row-by-row in visible order.
 - Use one JSON item per attendee row.
 - Preserve the visible attendee row order from top to bottom.
@@ -113,6 +162,7 @@ Metadata extraction:
 - If any top metadata is not visible or unclear, use these defaults when appropriate:
   training_title = "{training_title}"
   attendance_date = "{training_date}"
+  training_time = "{training_time}"
   facilitator_name = "{facilitator_name}"
 - Return ONLY the JSON array. No markdown, no commentary.
 """.strip()
@@ -127,6 +177,7 @@ Target schema for each item:
   "employee_id": "",
   "signature_present": true,
   "attendance_date": "",
+  "training_time":"",
   "training_title": "",
   "facilitator_name": "",
   "notes": ""
@@ -172,6 +223,7 @@ LMS_EXPORT_COLUMNS = [
     "employee_id",
     "signature_present",
     "attendance_date",
+    "training_time",
     "training_title",
     "facilitator_name",
     "notes",

@@ -267,7 +267,7 @@ def _repair_json_array(client: Any, model: str, raw_text: str) -> list[dict]:
 
 
 def _normalize_record(
-    row: dict, index: int, training_title: str, training_date: str, facilitator_name: str,
+    row: dict, index: int, training_title: str, training_date: str, training_time: str, facilitator_name: str,
 ) -> dict:
     """Normalize a single extracted row into the canonical schema."""
 
@@ -300,6 +300,7 @@ def _normalize_record(
         "employee_id": normalize_employee_id(row.get("employee_id", "")),
         "signature_present": to_bool(row.get("signature_present", False)),
         "attendance_date": str(row.get("attendance_date") or training_date).strip(),
+        "training_time": str(row.get("training_time") or training_time).strip(),
         "training_title": str(row.get("training_title") or training_title).strip(),
         "facilitator_name": str(row.get("facilitator_name") or facilitator_name).strip(),
         "notes": notes,
@@ -316,6 +317,7 @@ def extract_attendance(
     filename: str,
     training_title: str,
     training_date: str,
+    training_time: str,
     facilitator_name: str,
 ) -> list[dict]:
     """Extract attendance rows from a scanned sheet using Gemini Vision.
@@ -348,6 +350,7 @@ def extract_attendance(
     prompt = EXTRACTION_PROMPT_TEMPLATE.format(
         training_title=training_title,
         training_date=training_date,
+        training_time=training_time,
         facilitator_name=facilitator_name,
     )
     parts.append(types.Part.from_text(text=prompt))
@@ -363,13 +366,14 @@ def extract_attendance(
                 "employee_id": {"type": "STRING"},
                 "signature_present": {"type": "BOOLEAN"},
                 "attendance_date": {"type": "STRING"},
+                "training_time": {"type": "STRING"},
                 "training_title": {"type": "STRING"},
                 "facilitator_name": {"type": "STRING"},
                 "notes": {"type": "STRING"},
             },
             "required": [
                 "row_number", "name", "employee_id", "signature_present",
-                "attendance_date", "training_title", "facilitator_name", "notes",
+                "attendance_date", "training_time", "training_title", "facilitator_name", "notes",
             ],
         },
     }
@@ -399,6 +403,6 @@ def extract_attendance(
 
     return [
         _normalize_record(row, index, training_title,
-                          training_date, facilitator_name)
+                          training_date, training_time, facilitator_name)
         for index, row in enumerate(parsed_rows, start=1)
     ]
