@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import re
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 
 # ── API Configuration ───────────────────────────────────────────────────────
 
@@ -38,7 +41,8 @@ FILENAME_IMAGE_TYPES: dict[str, str] = {
 
 # ── Extraction ──────────────────────────────────────────────────────────────
 
-JSON_ARRAY_KEYS = ("rows", "attendance", "attendees", "data", "records", "entries")
+JSON_ARRAY_KEYS = ("rows", "attendance", "attendees",
+                   "data", "records", "entries")
 
 ROW_KEYS = {
     "row_number",
@@ -50,6 +54,7 @@ ROW_KEYS = {
     "facilitator_name",
     "notes",
 }
+
 
 EXTRACTION_PROMPT_TEMPLATE = """
 Extract attendance from this clinical training sign-in sheet.
@@ -66,6 +71,9 @@ Return a JSON array where each item follows this schema:
   "facilitator_name": "",
   "notes": ""
 }}
+
+You are a highly capable intelligent document processor. You will extract data from clinical training sign-in sheets, even when text is messy and handwritten.
+
 
 Instructions:
 - The sheet may have top metadata such as Session, Date, Time, and Trainer/Speaker.
@@ -137,7 +145,8 @@ Model output to repair:
 # ── Validation ──────────────────────────────────────────────────────────────
 
 EMPLOYEE_ID_PATTERN = re.compile(r"^HI\d{1,4}$")
-EMPLOYEE_ID_SEARCH_PATTERN = re.compile(r"\b[HM][1IL]\s*[-]?\s*\d{1,4}\b", re.IGNORECASE)
+EMPLOYEE_ID_SEARCH_PATTERN = re.compile(
+    r"\b[HM][1IL]\s*[-]?\s*\d{1,4}\b", re.IGNORECASE)
 NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z .'-]{1,79}$")
 
 ILLEGIBLE_HINTS = ("illegible", "unclear", "unknown", "hard to read", "?")

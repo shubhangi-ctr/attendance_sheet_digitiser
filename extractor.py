@@ -11,6 +11,7 @@ from typing import Any
 
 import fitz
 from PIL import Image, ImageOps
+from PIL import ImageEnhance
 
 from config import (
     API_MAX_OUTPUT_TOKENS,
@@ -81,7 +82,8 @@ def _split_image(image: Image.Image) -> list[Image.Image]:
     """Split an image in half along its longer axis."""
     width, height = image.size
     if width <= 1 and height <= 1:
-        raise ValueError("Unable to split image further while keeping chunk size under the limit.")
+        raise ValueError(
+            "Unable to split image further while keeping chunk size under the limit.")
 
     if height >= width and height > 1:
         midpoint = height // 2
@@ -106,7 +108,11 @@ def _load_image(file_bytes: bytes) -> Image.Image:
 
 def _prepare_image_bytes(image: Image.Image) -> tuple[bytes, str]:
     """Resize and encode an image; return *(raw_bytes, mime_type)*."""
-    prepared = _resize_for_model(image)
+    gray_image = image.convert('L')
+    enhancer = ImageEnhance.Contrast(gray_image)
+    processed_image = enhancer.enhance(2.0)  # Boost contrast significantly
+
+    prepared = _resize_for_model(processed_image)
     encoded = _encode_image(prepared, VIEW_IMAGE_MEDIA_TYPE)
 
     # Gemini supports 20 MB inline, but split if still too large
@@ -129,7 +135,8 @@ def _collect_image_parts(
     if mime_type == "application/pdf" or filename.lower().endswith(".pdf"):
         page_images = _pdf_to_png_images(file_bytes)
         if not page_images:
-            raise ValueError("The uploaded PDF did not contain any renderable pages.")
+            raise ValueError(
+                "The uploaded PDF did not contain any renderable pages.")
         for page_bytes in page_images:
             parts.append(_prepare_image_bytes(_load_image(page_bytes)))
     else:
@@ -140,7 +147,8 @@ def _collect_image_parts(
                     resolved_type = resolved
                     break
         if not resolved_type:
-            raise ValueError(f"Unsupported upload type: {mime_type or filename}")
+            raise ValueError(
+                f"Unsupported upload type: {mime_type or filename}")
         parts.append(_prepare_image_bytes(_load_image(file_bytes)))
 
     return parts
@@ -158,9 +166,11 @@ def _coerce_rows_payload(payload: Any) -> list[dict]:
         normalized_rows: list[dict] = []
         for item in payload:
             if not isinstance(item, dict):
-                raise ValueError("The model response list did not contain attendance row objects.")
+                raise ValueError(
+                    "The model response list did not contain attendance row objects.")
             if not (set(item.keys()) & ROW_KEYS):
-                raise ValueError("The model response list did not contain attendance row fields.")
+                raise ValueError(
+                    "The model response list did not contain attendance row fields.")
             normalized_rows.append(item)
         return normalized_rows
 
@@ -170,7 +180,8 @@ def _coerce_rows_payload(payload: Any) -> list[dict]:
             if isinstance(value, list):
                 return _coerce_rows_payload(value)
 
-    raise ValueError("The model response did not contain a valid attendance row array.")
+    raise ValueError(
+        "The model response did not contain a valid attendance row array.")
 
 
 def _extract_json_array(text: str) -> list[dict]:
@@ -209,7 +220,8 @@ def _generate_with_retry(client: Any, **kwargs: Any) -> Any:
         try:
             return client.models.generate_content(**kwargs)
         except Exception as exc:
-            status_code = getattr(exc, "status_code", getattr(exc, "code", None))
+            status_code = getattr(exc, "status_code",
+                                  getattr(exc, "code", None))
             is_retryable = status_code is not None and (
                 (isinstance(status_code, int) and status_code >= 500)
             )
@@ -318,7 +330,8 @@ def extract_attendance(
         from google import genai  # noqa: WPS433
         from google.genai import types  # noqa: WPS433
     except ImportError as exc:
-        raise RuntimeError("The `google-genai` package is not installed.") from exc
+        raise RuntimeError(
+            "The `google-genai` package is not installed.") from exc
 
     client = genai.Client(api_key=api_key)
     model = os.getenv("GEMINI_MODEL", GEMINI_MODEL)
@@ -385,6 +398,7 @@ def extract_attendance(
         parsed_rows = _repair_json_array(client, model, response_text)
 
     return [
-        _normalize_record(row, index, training_title, training_date, facilitator_name)
+        _normalize_record(row, index, training_title,
+                          training_date, facilitator_name)
         for index, row in enumerate(parsed_rows, start=1)
     ]
