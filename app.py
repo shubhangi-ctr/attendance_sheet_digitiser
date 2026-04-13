@@ -16,7 +16,7 @@ from validator import validate_rows
 
 # ── Page Configuration ─────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Attendance AI Digitiser",
+    page_title="Attendance AI Digitizer",
     page_icon="📋",
     layout="wide"
 )
@@ -184,7 +184,7 @@ if "editor_version" not in st.session_state:
     st.session_state.editor_version = 0
 
 # ── Header ─────────────────────────────────────────────────────────────────
-st.markdown('<div class="main-header"><h1>📋 AI Attendance Digitiser</h1><p>Upload a scanned paper attendance tracker, review the extracted rows, and export LMS-ready CSV.</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>📋 AI Attendance Digitizer</h1><p>Upload a scanned paper attendance tracker, review the extracted rows, and export LMS-ready CSV.</p></div>', unsafe_allow_html=True)
 
 tab_upload, tab_review = st.tabs(["📤 **UPLOAD CENTER**", "🔍 **DATA REVIEW**"])
 
